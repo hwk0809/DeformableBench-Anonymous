@@ -1,0 +1,34 @@
+# T24 诊断 profile（研究用，不进生产）：= stopface_h.yaml 逐行相同，只改一键——kt_ratio 单变量：3.0 -> 1.5（slip_max 加倍）
+# 出处 docs/GRIPPER-CONTACT.md §6 T24。
+
+pd_gains:
+  gripper_kp: 20000.0
+  gripper_kd: 100.0
+  gripper_effort: 6.0
+
+contact_materials:
+  stack_from_asset: true
+  contact_material_modulus: 20000.0     # E_t：纺织品横向压缩模量，见文件头 (5)
+  tri_sdf_contact: true
+  tri_sdf_compliant: true
+  gripper_two_way_coupling: true
+  gripper_contact_hardening: 0.0
+  gripper_contact_hardening_kcap: 0.0   # 硬化关 => 封顶无意义，见文件头 (1)(2)
+  table_contact_ke: 10000.0
+  # T13 真静摩擦锚（fix1-6 修完的 T8 锚）
+  sdf_anchor_kt_ratio: 1.5
+  default_shape_mu: 1.0
+  gripper_shape_mu: 1.0
+  rigid_feature_contact: false
+  contact_projection: false
+
+physics:
+  soft_contact_mu: 0.5
+
+task_params:
+  grasp_z_floor: 0.0
+
+collision_trick:
+  enabled: false
+
+sdf_backend: gridexact

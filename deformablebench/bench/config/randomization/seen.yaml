@@ -1,0 +1,18 @@
+# Difficulty preset: DR-TRAIN (seen) — visual DR ON, textures from the SEEN split.
+# Use for collecting the DR-trained arm's TRAINING data. Deep-merged over the task.
+#   collect_data --task <t> --randomization seen
+#
+# Textures come from the 10k-PNG "seen" half of table_all_11k.usda. Pair with the
+# `unseen` preset at eval so train/eval textures don't leak. (Table-height DR is
+# intentionally omitted for now.)
+texture:
+  enabled: true
+  split: seen
+  num_textures: 10000
+  sampling: sobol
+light:
+  enabled: true
+  exposure_range: [-0.7, 0.7]       # ±0.7 stop
+  color_temp_range: [4000, 6500]    # warm -> daylight
+  dome_intensity_range: [0.0, 0.15]
+  sampling: sobol

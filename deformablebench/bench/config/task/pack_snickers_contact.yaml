@@ -1,0 +1,13 @@
+# pack_snickers 的接触栈开关变体。生产 yaml 一行不改，见 flatten_tshirt_contact.yaml
+# 的完整说明与 docs/GRIPPER-CONTACT.md §1「2026-09-09 现状」。
+# 本任务生产配置已经是 control_mode: pd，所以只加两个接触键。
+#
+# 验收（T18 主批 n=6）：首抓 6/6、success=True 6/6。
+# ⚠ 未解：张爪后袋顶被带高 67-100%（lift_mm >5mm）。归因未定——袋子有提手环，
+# 既可能是提手环还挂在指头上（几何），也可能是真黏连，现有数据分不开；
+# 团队长 2026-09-09 裁定 pack 沿用 lift_mm 判据，不豁免。
+name: pack_snickers_contact
+base: pack_snickers
+
+contact_profile: stopface_h
+anchor_fix: true

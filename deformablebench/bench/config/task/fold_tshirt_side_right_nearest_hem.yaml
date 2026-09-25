@@ -1,0 +1,117 @@
+name: fold_tshirt_side_right_nearest_hem
+task_class: "deformablebench.bench.task.task_side_fold_tshirt_right_nearest_hem:TshirtFoldRightNearestHemTask"
+task_description: "side fold for the blue t-shirt: side folds followed by a forward fold"
+
+robot: piper
+cloth: "cloth/Tshirt_Blue_40k"
+planner: toppra
+control_mode: kinematic
+render: isaac_render
+
+max_steps: 500
+
+cloth_config:
+  backend: flexcomp
+  gripper_static_friction: 5.0
+  gripper_dynamic_friction: 5.0
+
+physics:
+  density: 0.10
+  particle_radius: 0.004
+  tri_ka: 500.0
+  tri_kd: 1.0e-4
+  tri_aniso_ke: [270.0, 150.0, 140.0]
+  edge_aniso_ke: [8.3168e-07, 8.3168e-07, 8.3168e-07]
+  edge_kd: 1.0e-4
+  soft_contact_margin: 0.003
+  soft_contact_ke: 300.0
+  soft_contact_kd: 0.1
+  soft_contact_mu: 1.0
+  solver_iterations: 10
+  linear_iterations: 10
+  style3d_self_collision: true
+  style3d_collision_radius: 0.001
+  style3d_collision_stiff_vf: 0.05
+  style3d_collision_stiff_ee: 0.02
+  style3d_collision_stiff_ef: 0.1
+
+contact_materials:
+  default_shape_mu: 1.2
+  gripper_shape_mu: 24.0
+
+stage_physics:
+  drag_edge:
+    enabled: true
+    default_shape_mu: 0.6
+    gripper_shape_mu: 24.0
+  forward_fold:
+    enabled: true
+    soft_contact_mu: 9.0
+    default_shape_mu: 6.5
+
+task_params:
+  grasp_close_val: 0.015
+  open_small_gripper: 0.4
+  safe_height: 0.22
+  grasp_settle_time: 0.6
+  test_lift_height: 0.05
+  fold_lift_height: 0.18
+  forward_fold_lift_height: 0.35
+  place_hover_z: 0.12
+  place_hover_z_max: 0.24
+  place_z: 0.02
+  forward_fold_place_z: 0.16
+  retract_y_offset: 0.02
+  lift_dist_gain: 0.45
+  lift_base_margin: 0.06
+  center_bias: 1.0
+  arc_midpoint_lift: 0.02
+  drag_edge_grasp_x_offset: 0.04
+  side_fold_hem_inward_offset: 0.015
+  # Dynamic hem definition for the new right-arm drag selector.  The right arm
+  # chooses the XY-nearest particle from the current lowest-Y 5% cloth band.
+  right_drag_hem_band_frac: 0.01
+
+grasp:
+  slow_approach: false
+  slow_approach_via_distance_range: [0.05, 0.10]
+  slow_approach_final_vel_scale: 0.08
+  ground_check: false
+  yaw_jitter: false
+  yaw_jitter_range_deg: [-3.0, 3.0]
+
+fold:
+  forward_fold_ratio: 1.0
+
+eval:
+  sim_duration: 20.0
+  check_interval: 2.0
+  success_check:
+    type: none
+
+randomization:
+  seed: 42
+  cloth_init:
+    target_body_name: cloth
+    base_pos: [0.30, -0.32, 0.01]
+    base_quat: [1, 0, 0, 0]
+    pos_offset:
+      enabled: true
+      range_x: [-0.02, 0.02]
+      range_y: [-0.02, 0.02]
+    rot_offset:
+      enabled: true
+      angle_range_deg: [-10, 10]
+      axis_z_only: true
+    wrinkled:
+      enabled: false
+    settle_duration: 0.8
+    sampling: random
+  robot_init:
+    start_pose: lift_silk
+    noise_scale: 0.0
+  light:
+    enabled: false
+
+cloth_init:
+  base_pos: [0.45, 0.0, 0.30]

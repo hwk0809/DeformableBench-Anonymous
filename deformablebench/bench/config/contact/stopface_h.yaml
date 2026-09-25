@@ -1,0 +1,127 @@
+# T17 收口配方 = stopface_gx（T15 转正候选）+ 摩擦统一 + 撤压深拐杖。
+# docs/GRIPPER-CONTACT.md T10-C / T17，实证与推导在
+# data/eval_out/gripper_penetration/T17/T17_RESULTS.md。
+# 任务 yaml 只需 `contact_profile: stopface_h`。默认路径不受影响。
+#
+# 每一项都是物理量，不是调参：
+#
+# 1) gripper_contact_hardening = 0.0  —— 硬化律（不可压芯）**不开**，用户裁定。
+#    物理上它是对的：织物横向压缩是「软 -> 硬化 -> 不可压芯」，
+#    p(eps)=k0*eps/(1-eps/eps_max) 的 eps_max = de Jong 的 0.32*t0
+#    （docs/local_docs/archive/cloth-pinch-contact-research.md）。
+#    不开它的理由是**数值的，不是物理的**：布解算是隐式的、不在乎，但指头是
+#    **显式耦合**——反作用力每个布 substep 算一次、在 2 ms 的 MuJoCo 步里保持
+#    不变（env.py::_simulate_pd：本 substep 机器人步之后按步后 body_q 算，
+#    下一 substep 开头 assign 进 state_0.body_f），所以指头看到的是「按本步
+#    起点位置算、步内恒定」的接触弹簧，有一条硬的稳定上限。
+#
+#    这条上限是推出来的，不是扫出来的（T17 第二阶段，
+#    tools/t17_kcrit_1dof.py + out/kcrit_1dof.json；格式实测见 out/mj_probe.json）：
+#    MuJoCo 的积分器实测是 **implicitfast**（mj_model.opt.integrator=3），
+#    它把「力对速度的导数」搬到左端：a = f(x_n,v_n) / (M + dt*c)。
+#    于是稳定边界不是教科书的 4m/dt^2，而是
+#        K_crit = 4*M/dt^2 + 2*c/dt
+#    M = body_mass + joint armature = 0.025 + 0.005 = 0.030 kg（mj qM 对角实测
+#      0.030000；含手臂耦合的 Schur 值 0.029916，差 0.3%）
+#    c = dof_damping 5 + 速度执行器 kv 100 = 105 N·s/m（两者都进隐式端；三个
+#      执行器的 actuator_forcelimited 都是 False，限力在关节级 jnt_actfrcrange
+#      = ±6 N，不触发 mujoco_warp 里「力被 forcerange 夹紧就丢速度导数」的分支）
+#    K 是**所有显式刚度之和**，位置执行器的 kp=2e4 也是一根显式弹簧，要扣掉：
+#        K_crit       = 4*0.030/0.002^2 + 2*105/0.002 = 30000 + 105000 = 135000 N/m
+#        k_crit(接触) = 135000 - 20000                                = 115000 N/m
+#    三条独立路径对上到 0.002%：闭式 115000 / numpy 复现该格式 115003 /
+#    真 MuJoCo 3.8.1 implicitfast 一步映射谱半径 115003。两个实测锚点都落在
+#    区间内：线性和（硬化关）2-4e4 N/m 一直稳 < k_crit < 硬化原样重载
+#    Sigma 1.6e7 N/m（出 115 N 指力尖峰、②释放 FAIL）。
+#
+#    代价的账（T17_RESULTS.md §8.3，flatten s42 实测 DIAG）：不可压芯的切线刚度
+#    按构造是 k/den^2 = 400*k，实测线性和 2.1-3.9e4 ⇒ 芯处要 0.8-1.6e7 N/m，
+#    **比 k_crit 高约 100 倍**。按 0.5*k_crit 的预算（kcap 9.2、k_max 57500 N/m）
+#    实跑，封顶把硬化压到 s = 0.0043-0.0092，芯处只多出 +8%..+17% 的法向力
+#    ——硬化在重载段等于近乎关闭；要让 s=0.1 需要 k_max = 11.6*k_crit，即直接
+#    进发散区（= 无封顶那跑 stopface_gx_wall 的 115 N 尖峰 + ②释放 FAIL）。
+#    而且**就在 0.5*k_crit 这条预算上**，flatten s42 的指力峰已经从基线的
+#    8.8 N 顶到 **17.97 N**（12 个孤立单帧 >9 N，无 NaN、无成片发散），
+#    超了「峰 <= 1.5*effort = 9 N」的稳定门 —— 即：把硬化开到「刚够有点用」
+#    之前，指力就先破门了。
+#    **⇒ 在 dt=2 ms 的显式指头上，不可压芯放不进去**，故本配方不开。
+#
+# 2) gripper_contact_hardening_kcap = 0.0（且不设顶层 harden_kcap）
+#    硬化关着，封顶无意义；不设 harden_kcap 就不会把 T17_SDF_HARDEN_KCAP 传给
+#    fork，力核走 OFF 路径（§2 已验收逐位不变），连 Sigma 的 atomic 累加都不发生。
+#    要复现 T17 的硬化实验：把 (1) 改回 0.32、(2) 改回 9.2 并加回
+#    `harden_kcap: true`（kcap 的推导口径是 k_max = kcap*body_mass/dt^2，
+#    body_mass 0.025 kg，armature 那 0.005 被吸收进 kcap；换机器人/换步长要重跑
+#    tools/t17_kcrit_1dof.py 重新定 kcap）。
+#
+# 3) 摩擦：布侧统一一个系数 physics.soft_contact_mu = 1.2（用户裁定，2026-09-18），
+#    指面 gripper_shape_mu = 1.0 => 布-指 mu_eff = sqrt(1.2*1.0) = 1.095；
+#    桌面不再被 default_shape_mu 覆盖（原来写的 1.0 就是 newton 的 shape 默认，
+#    删掉无影响，只是不再占键）。两个键仍显式写在这里：深合并只能覆盖、不能删键，
+#    任务 yaml 里的 gripper_shape_mu(5/10/25) / soft_contact_mu(0.2..3.0) 必须被盖住。
+#    旧值 soft_contact_mu 0.5（mu_eff 0.707）撤掉的实测（grasp_silk_bimanual × pi05
+#    闭环，seed 41，data/eval_out/TUP3G/TUP3G_GRASP.md §13/§17/§19/§21）：
+#      0.5 档 N50 = 47/50；失败手都是「到位却没夹住」——合爪期间 f_n≈0 时布角被指头
+#      横向推走 -9.7 mm（开环回放同动作串：布侧摩擦放回后 -0.5 mm）；
+#      1.2 档 N50 = 50/50（2.5 档同为 50/50，KIN 50/50）。
+#
+# 5) 2026-09-18 起本配方**不再改布侧**（data/eval_out/TUP3G/TUP3G_GRASP.md §9-§21、
+#    TUP3G_NOSTICK.md）：
+#    a. 撤掉硬桌 contact_materials.table_contact_ke（原 10000）：布-桌刚度回到任务
+#       生产值 soft_contact_ke。同 10 集闭环：硬桌 4/10，去硬桌 8/10。
+#    b. 碰撞厚度统一：stack_from_asset 不再把布的 particle_radius 覆盖成 t0/2，布侧 r
+#       用任务生产值；夹爪壳半厚 h(tri_sdf_half_thickness) = 该 r（silk r=h=4 mm，
+#       tshirt 4 mm，nonwoven bag 3 mm）。t0 / E_t 仍取自资产 meta，只进刚度律
+#       k = E_t*A/t0（task/spec.py::scene_config）。老行为的开关：
+#       contact_materials.stack_particle_radius_from_asset: true。
+#    c. 牛顿迭代 solver_iterations 不在本文件：silk 两个 *_contact 任务 yaml 各自写 15。
+#
+# 4) task_params.grasp_z_floor = 0.0
+#    压深拐杖退回 0：多压 2 mm 是拿几何硬塞载荷，正是硬化律要替掉的东西。
+#    （-0.002 是 T2 台架参数，本来就禁入生产 yaml。）
+
+pd_gains:
+  gripper_kp: 20000.0
+  gripper_kd: 100.0
+  gripper_effort: 6.0
+
+contact_materials:
+  stack_from_asset: true
+  tri_sdf_contact: true
+  tri_sdf_compliant: true
+  gripper_two_way_coupling: true
+  gripper_contact_hardening: 0.0
+  gripper_contact_hardening_kcap: 0.0   # 硬化关 => 封顶无意义，见文件头 (1)(2)
+  # T13 真静摩擦锚（fix1-6 修完的 T8 锚）
+  sdf_anchor_kt_ratio: 3.0
+  gripper_shape_mu: 1.0
+  rigid_feature_contact: false
+  contact_projection: false
+
+physics:
+  soft_contact_mu: 1.2   # 布侧统一系数，见文件头 (3)
+
+task_params:
+  grasp_z_floor: 0.0
+  # T64:接触栈合爪指令全闭(PD 位置律下 0.015 = 目标缝 1.05 mm,薄咬即塌力,docs/GRIPPER-CONTACT.md ⑳㉔㉚)。
+  # preset 深合并赢过任务 yaml;只作用于开了 contact_profile 的任务。pack 按手区分的键
+  # (snickers_grasp_close_val / bag_close_gripper_value)是另外的键,不受影响。
+  grasp_close_val: 0.0
+
+collision_trick:
+  enabled: false
+
+# T15：精确后端走「最近三角形表 + 伪法向」的 O(1) 查询（T15_SDF_GRIDEXACT）。
+sdf_backend: gridexact
+
+# T63（2026-09-14）F2 转正：下面两个键与 sdf_backend / anchor_fix 同一条路——入口的
+# apply_contact_backend_env() 在 import newton 之前转成环境变量（fork 里是 wp.constant），
+# 显式环境变量优先。现状、门与已知边界见 docs/GRIPPER-CONTACT.md §1「F2 转正」。
+#   tri_projection: 0.5 -> T41_TRI_SDF_PROJECTION=1 T42_TRI_DEEP_ONLY_MM=0.5
+#       三角形级两段式投影：只把穿过刀面 > 0.5 mm 的布三角拉回，常规压深不动，
+#       力核 / 反作用读投影前快照（T42 臂 A）。
+#   edge_seeds: 14      -> T52_TRI_SDF_EDGE_SEEDS=14 T59_SEED_CVALID_FIX=1 T59_SEED_PASS=1
+#       tri-SDF 最近点搜索加「刚体网格棱穿三角」种子（F2，治刀尖从三角中间扎穿的盲区），
+#       永远连同零权重缓存修复（§1 ㉛）与逐位等价的拆 pass 提速一起开。
+tri_projection: 0.5
+edge_seeds: 14

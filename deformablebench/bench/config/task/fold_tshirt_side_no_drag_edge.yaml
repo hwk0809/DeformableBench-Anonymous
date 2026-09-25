@@ -1,0 +1,126 @@
+name: fold_tshirt_side_no_drag_edge
+task_class: "deformablebench.bench.task.task_side_fold_tshirt_no_drag_edge:TshirtFoldNoDragEdgeTask"
+task_description: "side (侧着叠) fold for the blue 9k t-shirt without the intermediate edge pullback: side folds followed by a forward fold"
+
+robot: piper
+# cloth: "cloth/blue_tshirt_9k"
+cloth: "cloth/Tshirt_Blue_40k"
+planner: toppra
+control_mode: kinematic
+render: isaac_render
+
+max_steps: 800
+
+# Match task_side_fold_tshirt_v2.py standalone defaults.
+cloth_config:
+  backend: flexcomp
+  gripper_static_friction: 5.0
+  gripper_dynamic_friction: 5.0
+
+# Per-task cloth physics overrides. Field names here are NewtonClothParams
+# runtime names: tri_aniso_ke = stretch_stiff, edge_aniso_ke = bend_stiff,
+# particle_radius = effective collision radius, soft_contact_mu = cloth/body
+# friction. Tune these locally without changing the shared blue_tshirt_9k asset.
+physics:
+  density: 0.10
+  particle_radius: 0.004
+  tri_ka: 500.0
+  tri_kd: 1.0e-4
+  tri_aniso_ke: [270.0, 150.0, 140.0]
+  edge_aniso_ke: [8.3168e-07, 8.3168e-07, 8.3168e-07]
+  edge_kd: 1.0e-4
+  soft_contact_margin: 0.003
+  soft_contact_ke: 300.0
+  soft_contact_kd: 0.1
+  soft_contact_mu: 1.0
+  solver_iterations: 10
+  linear_iterations: 10
+  style3d_self_collision: true
+  style3d_collision_radius: 0.001
+  style3d_collision_stiff_vf: 0.05
+  style3d_collision_stiff_ee: 0.02
+  style3d_collision_stiff_ef: 0.1
+
+contact_materials:
+  default_shape_mu: 1.2
+  gripper_shape_mu: 24.0
+
+# The drag_edge block is intentionally retained so this config stays aligned
+# with fold_tshirt_side.yaml; the task variant skips that entire stage.
+stage_physics:
+  drag_edge:
+    enabled: true
+    default_shape_mu: 0.6
+    gripper_shape_mu: 24.0
+  forward_fold:
+    enabled: true
+    soft_contact_mu: 3.0
+    default_shape_mu: 1.5
+
+task_params:
+  grasp_close_val: 0.015
+  open_small_gripper: 0.4
+  safe_height: 0.22
+  grasp_settle_time: 0.6
+  test_lift_height: 0.05
+  # Minimum TCP Z for the inner-side fold's initial lift. The actual value is
+  # max(this value, adaptive_hover_z + 0.03). The far-side fold remains fixed
+  # at 0.10 m by the inherited episode plan.
+  fold_lift_height: 0.25
+  forward_fold_lift_height: 0.35
+  place_hover_z: 0.12
+  place_hover_z_max: 0.24
+  place_z: 0.02
+  forward_fold_place_z: 0.16
+  retract_y_offset: 0.02
+  lift_dist_gain: 0.45
+  lift_base_margin: 0.06
+  center_bias: 1.0
+  arc_midpoint_lift: 0.02
+  # Retained for exact config parity; unused because drag-edge is skipped.
+  drag_edge_grasp_x_offset: 0.04
+  side_fold_hem_inward_offset: 0.015
+
+grasp:
+  slow_approach: false
+  slow_approach_via_distance_range: [0.05, 0.10]
+  slow_approach_final_vel_scale: 0.08
+  ground_check: false
+  yaw_jitter: false
+  yaw_jitter_range_deg: [-3.0, 3.0]
+
+fold:
+  forward_fold_ratio: 0.9
+
+eval:
+  sim_duration: 20.0
+  check_interval: 2.0
+  success_check:
+    type: none
+
+randomization:
+  seed: 42
+  cloth_init:
+    target_body_name: cloth
+    base_pos: [0.30, -0.32, 0.01]
+    base_quat: [1, 0, 0, 0]
+    pos_offset:
+      enabled: true
+      range_x: [-0.02, 0.02]
+      range_y: [-0.02, 0.02]
+    rot_offset:
+      enabled: true
+      angle_range_deg: [-10, 10]
+      axis_z_only: true
+    wrinkled:
+      enabled: false
+    settle_duration: 0.8
+    sampling: random
+  robot_init:
+    start_pose: lift_silk
+    noise_scale: 0.0
+  light:
+    enabled: false
+
+cloth_init:
+  base_pos: [0.45, 0.0, 0.30]

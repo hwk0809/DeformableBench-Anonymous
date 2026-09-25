@@ -1,0 +1,17 @@
+# grasp_silk_bimanual 的接触栈开关变体。生产 yaml 一行不改，见
+# flatten_tshirt_contact.yaml 的完整说明与 docs/GRIPPER-CONTACT.md §1「2026-09-09 现状」。
+#
+# 验收（T18 主批 n=6）：轮 1 OK/OK 6/6、success=True score=100 6/6。
+# silk「首次抓不上」的根因是刀尖相对布面的高度（IK 零误差、PD 被壳顶起），已由
+# 「指尖到桌面 + 摩擦统一」解掉——两者都在 stopface_h 里，这里不再单独设 z。
+name: grasp_silk_bimanual_contact
+base: grasp_silk_bimanual
+
+control_mode: pd
+contact_profile: stopface_h
+anchor_fix: true
+
+task_params:
+  grasp_close_val: 0.0
+
+# 牛顿迭代用生产默认 10(2026-09-19:nl10 闭环 N50 49/50,nl15 为 50/50,差在一集波动内)。

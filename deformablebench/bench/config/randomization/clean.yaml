@@ -1,0 +1,11 @@
+# Difficulty preset: CLEAN — no visual DR (default white table + baseline lighting).
+# Deep-merged over the task's own randomization block (geometric randomization like
+# cloth pos / robot init stays as the task sets it; only texture/light are forced off).
+#
+# Use for: clean-training data collection AND easy eval.
+#   collect_data --task <t> --randomization clean
+#   eval_policy  --task <t> --randomization clean
+texture:
+  enabled: false
+light:
+  enabled: false

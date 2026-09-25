@@ -1,0 +1,27 @@
+# flatten_tshirt 的**接触栈开关变体**。生产 `flatten_tshirt.yaml` 一行不改；
+# 这里只用 `base:` 继承它，再打开 T18 接触配方。要跑原来的路径就还用 flatten_tshirt。
+#
+# 配方与验收：docs/GRIPPER-CONTACT.md §1「2026-09-09 现状」。
+#   contact_profile: stopface_h  -> 线性压力律 + tri-SDF(gridexact) + T8 静摩擦锚
+#                                   + μ_eff 全局 0.7071 + 指尖到桌面 + 厚度/模量从资产
+#   anchor_fix: true             -> T18_SDF_ANCHOR_FIX=5（接触 Hessian 散射权重自洽）
+# 需要 fork thirdparty/newton_style3d @ deformable-bench（正式线，bf24cfb8 起）。
+#
+# 三个非接触键为什么在这儿（不是调参，是 PD 抓取本身要的，见 T17/T18 的 t17_flatten_h_*）：
+#   control_mode: pd            接触栈只在 PD 通道上有意义，kinematic 不看接触力
+#   grasp_close_val: 0.0        全闭；钳口缝由布的厚度定，不由指令定
+#   grasp_pose_constraint       抓取位姿放开一个转动自由度（local 系），刀面贴布
+#
+# 验收（T18 主批 n=6）：首抓 6/6；持布指力中位 5.95-6.24N、四指峰 7.8-8.9N（门 <=9N）。
+# ⚠ 未解：张爪后布被带走（lift_mm > 5mm）约 4-5 成的跑，判据与复算见 tools/contact/。
+name: flatten_tshirt_contact
+base: flatten_tshirt
+
+control_mode: pd
+contact_profile: stopface_h
+anchor_fix: true
+
+task_params:
+  grasp_close_val: 0.0
+  grasp_pose_constraint: [1, 1, 1, 1, 0, 1]
+  grasp_pose_constraint_frame: local

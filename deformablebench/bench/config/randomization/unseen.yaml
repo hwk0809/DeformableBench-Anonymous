@@ -1,0 +1,18 @@
+# Difficulty preset: HARD eval (unseen) — visual DR ON, textures from the UNSEEN
+# split (1k PNGs held out from training). Use for hard eval of any policy.
+#   eval_policy --task <t> --randomization unseen
+#
+# Same lighting range as `seen`; differs ONLY in texture.split, so a policy trained
+# on `seen` is tested on textures it never saw. (Table-height DR omitted for now;
+# deformable tasks have no clutter -> this is a partial-Hard vs RoboTwin.)
+texture:
+  enabled: true
+  split: unseen
+  num_textures: 1000
+  sampling: sobol
+light:
+  enabled: true
+  exposure_range: [-0.7, 0.7]
+  color_temp_range: [4000, 6500]
+  dome_intensity_range: [0.0, 0.15]
+  sampling: sobol

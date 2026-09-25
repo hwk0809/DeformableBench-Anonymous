@@ -1,0 +1,187 @@
+# T24 arm m40k（研究变体，非采集用）：= t17_flatten_h_s45.yaml，只改 name / contact_profile / cloth。
+# R16-A2' h ladder, rung 2: the SDF shell raised 0.5 -> 1.5 mm.
+# Identical to flatten_tshirt_r13c_s42.yaml in every other line.
+#
+# Why a bigger shell is legitimate here and was not before: with the EXACT query
+# backend h is a pure geometric offset with no field error attached, so raising
+# it buys a wider capture window and a stop point of ~2h + layer without buying
+# any of the sub-voxel error the 1 mm grid carried at h = 0.5 mm. The cost is
+# bounded and stated: the force starts up to 1 mm earlier.
+# k_tri is NOT rescaled by this: t0 in k_tri = E_t*A/t0 is the cloth's own
+# thickness (1 mm, asset meta), passed explicitly, not 2h.
+#
+# NOT for data collection: research variant.
+# E4 ablation arm P1 (docs/GRIPPER-CONTACT.md 6.E4 matrix).
+# Base = flatten_tshirt_v31.yaml (main-line stack v3.1, s42). ONLY the contact
+# stack differs; the task, grasp points, mesh and randomisation are untouched.
+#
+# P1 -- penalty only, particle_radius 0.5 mm (physical half-thickness),
+# contact offset 4 mm. The arm E3 never ran: does the bare penalty leak
+# on a thin shell once the force band no longer depends on the radius?
+# Cloth-vs-jaw effective thickness 1 mm. One mechanism -- the ideal
+# solution if it passes the gate.
+#
+# NOT for data collection: research variant.
+
+name: t24_flatten_m40k_s45
+contact_profile: stopface_h   # T24 arm m40k
+task_class: "deformablebench.bench.task.task_flatten_tshirt:FlattenTshirtTask"
+task_description: "grasp the exposed left shoulder and left hem, then flatten the T-shirt"
+
+robot: piper
+cloth: "cloth/Tshirt_Blue_40k"   # T24 arm m40k: 只换网格
+planner: toppra
+control_mode: pd
+render: isaac_render
+max_steps: 400
+
+
+planner_override:
+  velocity_limits: 5.0
+  acceleration_limits: 5.0
+
+task_params:
+  # T2 台架：刀压深扫描。**台架参数，禁入生产 yaml**
+  grasp_z_floor: -0.002
+  grasp_close_val: 0.0   # full close; cloth sets the gap
+  # Free the tool-frame pitch during the descent so IK can lay the blades along
+  # the wrinkle: the cloth ends up pinched rather than draped over a blade back,
+  # which is what decides whether it lets go on release (PENETRATION.md 0.1(3c)).
+  grasp_pose_constraint: [1, 1, 1, 1, 0, 1]
+  grasp_pose_constraint_frame: local
+  lift_height: 0.4
+  # Keep the benchmark's strict whole-garment lift gate; semantic-point probe
+  # telemetry separately distinguishes a real grip from a nearby-layer swap.
+  success_thresh: 0.15
+  lift_y_half_min: 0.17
+  lift_y_half_max: 0.30
+  fling_forward_amplitude: 0.40
+  fling_back_amplitude: 0.04
+  fling_height: 0.12
+  fling_drag_dist: 0.18
+  fling_mid_low_height: 0.20
+  fling_low_height: 0.03
+  fling_vel_scale: 1.5
+  fling_accel_scale: 2.5
+  # --- FlattenTshirtEvaluator (closed-loop policy eval) ---
+  # PROVISIONAL thresholds calibrated on 9 scripted-expert seeds + 1 crumple
+  # baseline (2026-07-16). Re-lock with more expert seeds / final init design.
+  terminal_settle_sec: 2.0
+  flatten_success_coverage: 0.60   # settled footprint bar
+  flatten_success_weightd: 0.25    # ICP-to-canonical shape bar (clean gap 0.225|0.273)
+  flatten_success_mean_z: 0.03     # on-ground gate
+  flatten_score_w_cov: 0.4         # score = 100*(0.4*cov_norm + 0.6*shape_norm)
+  flatten_cov_lo: 0.25
+  flatten_cov_hi: 0.78
+  flatten_wd_hi: 0.36
+  flatten_wd_lo: 0.196
+
+cloth_config:
+  gripper_static_friction: 10.0
+  gripper_dynamic_friction: 10.0
+  air_damping: 0.15
+
+physics:
+  density: 0.09
+  tri_ka: 500.0
+  tri_kd: 5.0e-5
+  tri_aniso_ke: [270.0, 150.0, 140.0]
+  edge_aniso_ke: [4.3168e-07, 4.3168e-07, 4.3168e-07]
+  edge_kd: 5.0e-5
+  soft_contact_margin: 0.002
+  soft_contact_ke: 15.0
+  soft_contact_kd: 0.05
+  # R2-1b 摩擦物理化：全局布-刚体 μ 从历史失真值 3.0 退回物理量级 0.5
+  # (布-桌 μ≈0.3-0.6)。gripper_shape_mu 不设 = 沿用 MJCF 指垫 friction 2.0，
+  # 故夹爪 μ_eff = sqrt(0.5*2.0) = 1.0（原 sqrt(3.0*2.0) = 2.45）。唯一变量。
+  soft_contact_mu: 0.5
+  solver_iterations: 20
+  linear_iterations: 10
+  style3d_self_collision: true
+  style3d_collision_radius: 0.0003
+  style3d_collision_stiff_vf: 0.005
+  style3d_collision_stiff_ee: 0.002
+  style3d_collision_stiff_ef: 0.02
+
+contact_materials:
+  # 布-夹爪摩擦按一手实测定：弹性体-硬面 mu=0.35+-0.02 (JMPS 164:104885)、织物-钢 0.25
+  # (Rajanala 2003)。mu_eff = sqrt(soft_contact_mu * gripper_shape_mu) = sqrt(0.5*0.245) = 0.35
+  gripper_shape_mu: 0.245   # T12: mu_eff = sqrt(0.5*0.245) = 0.35
+  # T12 锚：tri-SDF 真静摩擦（T8），锥内切向弹簧零蠕滑。0 = 逐位不变。
+  sdf_anchor_kt_ratio: 3.0
+  # --- R13 变体 1c（docs/GRIPPER-CONTACT.md §6.R13 1c 细则）-------------
+  # 栈与 1b 逐行相同；唯一差别在 fork：硬化律从顶点罚力核移植进 compliant
+  # tri-SDF 力核（fork penetration-dev-R13c）。1b 里 gripper_contact_hardening
+  # 挂在 ke=0 的通道上、从未上场；1c 里同一个 0.32 作用在 SDF 力律上。
+  # 1a（band 1mm + ke 3000 + SDF 投影）门 3 满分但门 4 倒（接触 0 / 指力 0 /
+  # 过面 5-6 帧 / 顶点 -0.42、-1.13mm）。按方案预设分支：门 4 穿透 => 进 1b，
+  # SDF 从"保底"转"承力"。
+  # 栈 = compliant 三角 SDF(h=0.5mm) 承力 + t0 参考硬化 + 顶点罚力通道退 0。
+  # 形态基点 = R9 的 flatten_tshirt_r9s_comp6.yaml（同 E_t=6500Pa、同两个
+  # tri_sdf 开关）；与 comp6 的唯一形态差别是 tri_sdf_disable_stock_penalty
+  # 保持默认 true——方案明写"顶点罚力通道退 0"，comp6 那行 false 与之相反，
+  # 故不照抄（保守解释：以方案文字为准）。
+  # 承力模式：env.py:460 会把夹爪 shape_contact_ke 运行时置 0。
+  # t0 参考硬化（fork penetration-dev-R13）。de Jong 不可压芯 = 68% 厚度
+  # => 单层压缩 <= 0.32*t0（docs/local_docs/archive/cloth-pinch-contact-research.md）。
+  rigid_feature_contact: false
+  contact_projection: false
+eval:
+  sim_duration: 20.0
+  check_interval: 1.0
+  success_check:
+    type: all
+    checks:
+      - {type: coverage, threshold: 0.7}
+      - {type: mean_z_below, threshold: 0.03}
+
+randomization:
+  seed: 45
+  cloth_init:
+    mode: procedural_fold
+    base_pos: [0.319347, -0.342035, 0.01]
+    base_quat: [1, 0, 0, 0]
+    pos_offset: {enabled: true, range_x: [-0.02, 0.02], range_y: [-0.02, 0.02]}
+    rot_offset: {enabled: true, axis_z_only: true, angle_range_deg: [-5, 5]}
+
+    procedural_fold:
+      protected_keypoints: [left_shoulder, left_hem]
+      protection_radius: 0.045
+      max_patch_pins: 16
+      # null samples uniformly; set a program name to debug one topology.
+      program: null
+      lift_height: [0.08, 0.16]
+      segment_durations: [0.25, 0.50, 0.25]
+      final_z: 0.012
+      protected_settle_duration: 0.8
+      settle_duration: 0.4
+      programs:
+        right_sleeve_in:
+          - {handle: right_sleeve_outer, target: right_shoulder, offset: [-0.02, 0.00]}
+        right_half_in:
+          - {handle: right_sleeve_outer, target: center, offset: [0.00, 0.03]}
+          - {handle: right_hem, target: center, offset: [0.03, -0.03]}
+        center_bunch:
+          - {handle: right_collar, target: center, offset: [-0.02, 0.00]}
+          - {handle: right_shoulder, target: center, offset: [0.03, 0.02]}
+
+  robot_init:
+    start_pose: "lift_silk"
+    noise_scale: 0.0
+  light: {enabled: false}
+
+# --- T10-B ---------------------------------------------------------------
+# 接触栈不在本文件里：`contact_profile: stopface` 把
+# src/deformablebench/bench/config/contact/stopface.yaml 深合并进来且预设胜出
+# （壳 h / particle_radius / E_t 由 stack_from_asset 从资产 meta 读，
+#  pd_gains kp 2e4 + effort 6 N、硬化 0、硬桌 1e4、collision_trick 关）。
+# 本文件相对 T9 的 nowall 臂只改三处：name、randomization.seed、
+# contact_materials.gripper_shape_mu（=本包唯一自变量 μ_eff）。
+# 任务参数（task_params / 轨迹 / eval 门限 / cloth_init）一律未动。
+# 非采集用：研究变体。
+
+# --- T12 ---------------------------------------------------------------
+# 基座 = t10_flatten_mu070_s{seed}.yaml（T10-B stopface，已删残留力带两行）。
+# 相对基座**只改两键**：contact_materials.sdf_anchor_kt_ratio 与 gripper_shape_mu。
+# 其余（预设、task_params、轨迹、eval、cloth_init）逐行未动。
+# 非采集用：研究变体。

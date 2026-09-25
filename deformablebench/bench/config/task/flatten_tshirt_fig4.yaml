@@ -1,0 +1,15 @@
+# Figure 4 configuration ladder. Inherits the canonical flatten task and adds
+# the mirrored fold used only to build the cumulative C2 visualization.
+base: flatten_tshirt
+name: flatten_tshirt_fig4
+
+randomization:
+  cloth_init:
+    procedural_fold:
+      settle_duration: 1.2
+      programs:
+        right_sleeve_corner_in:
+          - {handle: right_sleeve_outer, target: right_shoulder, offset: [-0.04, 0.005], lift_height: 0.07, final_z: 0.006, settle: 0.30}
+        left_half_in:
+          - {handle: left_sleeve_outer, target: center, offset: [0.00, 0.03]}
+          - {handle: left_hem, target: center, offset: [-0.03, -0.03]}

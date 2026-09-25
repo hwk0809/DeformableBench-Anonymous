@@ -1,0 +1,118 @@
+# ============================================================================
+# fold_tshirt_side V3 (2026-07-15) — grasp-holding physics fix. V2 (fold_tshirt_side.yaml)
+# is kept UNCHANGED for provenance of the original 192-ep dataset & pi05_fold_tshirt ckpt.
+# Changes vs v2:
+#   1. soft_contact_ke 10 -> 500: v2's cloth-rigid contact stiffness gave mN-level
+#      friction budget — even the scripted expert's clean pinch dropped the cloth on a
+#      20cm lift (pinch unit test). 500 = SIM1's value; holds lift/drag/shake, stable
+#      to 8000. Old ckpt evaled under ke500: success 1/10 -> 4/10, mean 19 -> 58.
+#   2. stage_physics REMOVED: v2 collection dynamically boosted friction per stage
+#      (drag_edge: table 0.6/gripper 24; forward_fold: soft_mu 3.0) — closed-loop eval
+#      never applies these (no stage concept) => train/eval physics mismatch. Expert
+#      revalidated 7/8 full score under constant ke500 physics without them.
+# See docs/local_docs/fold-grasp-physics-findings.md for the full evidence chain.
+# ============================================================================
+name: fold_tshirt_side_v3
+task_class: "deformablebench.bench.task.task_side_fold_tshirt_v2:TshirtFoldV2Task"
+task_description: "side (侧着叠) fold for the blue 9k t-shirt: side folds followed by a forward fold"
+
+robot: piper
+cloth: "cloth/blue_tshirt_9k"
+planner: toppra
+control_mode: kinematic
+render: isaac_render
+
+max_steps: 500
+
+# Match task_side_fold_tshirt_v2.py standalone defaults.
+cloth_config:
+  backend: flexcomp
+  gripper_static_friction: 5.0
+  gripper_dynamic_friction: 5.0
+
+# Per-task cloth physics overrides. Field names here are NewtonClothParams
+# runtime names: tri_aniso_ke = stretch_stiff, edge_aniso_ke = bend_stiff,
+# particle_radius = effective collision radius, soft_contact_mu = cloth/body
+# friction. Tune these locally without changing the shared blue_tshirt_9k asset.
+physics:
+  density: 0.10
+  particle_radius: 0.004
+  tri_ka: 500.0
+  tri_kd: 1.0e-4
+  tri_aniso_ke: [270.0, 150.0, 140.0]
+  edge_aniso_ke: [8.3168e-07, 8.3168e-07, 8.3168e-07]
+  edge_kd: 1.0e-4
+  soft_contact_margin: 0.003
+  soft_contact_ke: 500.0
+  soft_contact_kd: 0.1
+  soft_contact_mu: 1.0
+  solver_iterations: 10
+  linear_iterations: 10
+  style3d_self_collision: true
+  style3d_collision_radius: 0.0003
+  style3d_collision_stiff_vf: 0.005
+  style3d_collision_stiff_ee: 0.002
+  style3d_collision_stiff_ef: 0.02
+
+contact_materials:
+  default_shape_mu: 1.2
+  gripper_shape_mu: 16.0
+
+task_params:
+  grasp_close_val: 0.015
+  safe_height: 0.22
+  grasp_settle_time: 0.6
+  test_lift_height: 0.05
+  fold_lift_height: 0.18
+  place_hover_z: 0.12
+  place_hover_z_max: 0.24
+  place_z: 0.02
+  retract_y_offset: 0.02
+  lift_dist_gain: 0.45
+  lift_base_margin: 0.06
+  center_bias: 1.0
+  arc_midpoint_lift: 0.02
+
+grasp:
+  slow_approach: false
+  slow_approach_via_distance_range: [0.05, 0.10]
+  slow_approach_final_vel_scale: 0.08
+  ground_check: false
+  yaw_jitter: false
+  yaw_jitter_range_deg: [-3.0, 3.0]
+
+fold:
+  forward_fold_ratio: 0.9
+
+eval:
+  sim_duration: 20.0
+  check_interval: 2.0
+  success_check:
+    type: none
+
+randomization:
+  seed: 42
+  cloth_init:
+    target_body_name: cloth
+    base_pos: [0.30, -0.32, 0.01]
+    base_quat: [1, 0, 0, 0]
+    pos_offset:
+      enabled: true
+      range_x: [-0.02, 0.02]
+      range_y: [-0.02, 0.02]
+    rot_offset:
+      enabled: true
+      angle_range_deg: [-10, 10]
+      axis_z_only: true
+    wrinkled:
+      enabled: false
+    settle_duration: 0.8
+    sampling: random
+  robot_init:
+    start_pose: lift_silk
+    noise_scale: 0.0
+  light:
+    enabled: false
+
+cloth_init:
+  base_pos: [0.45, 0.0, 0.30]

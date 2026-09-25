@@ -1,0 +1,136 @@
+# Hard procedural-fold initialization. The center patch is anchored while either
+# the outer/right or inner/left side folds inward. Task grasp patches are not
+# protected, so left_shoulder and left_hem may move toward the center or be covered.
+name: flatten_tshirt_init_difficulty_hard
+task_class: "deformablebench.bench.task.task_flatten_tshirt:FlattenTshirtTask"
+task_description: "locate and grasp the left shoulder and left hem, then flatten the T-shirt"
+
+robot: piper
+cloth: "cloth/blue_tshirt_9k"
+planner: toppra
+control_mode: kinematic
+render: isaac_render
+max_steps: 400
+
+planner_override:
+  velocity_limits: 5.0
+  acceleration_limits: 5.0
+
+task_params:
+  grasp_close_val: 0.015
+  lift_height: 0.4
+  success_thresh: 0.15
+  lift_y_half_min: 0.17
+  lift_y_half_max: 0.30
+  fling_forward_amplitude: 0.40
+  fling_back_amplitude: 0.04
+  fling_height: 0.12
+  fling_drag_dist: 0.18
+  fling_mid_low_height: 0.20
+  fling_low_height: 0.03
+  fling_vel_scale: 1.5
+  fling_accel_scale: 2.5
+
+cloth_config:
+  gripper_static_friction: 10.0
+  gripper_dynamic_friction: 10.0
+  air_damping: 0.15
+
+physics:
+  density: 0.09
+  particle_radius: 0.004
+  tri_ka: 500.0
+  tri_kd: 5.0e-5
+  tri_aniso_ke: [270.0, 150.0, 140.0]
+  edge_aniso_ke: [4.3168e-07, 4.3168e-07, 4.3168e-07]
+  edge_kd: 5.0e-5
+  soft_contact_margin: 0.002
+  soft_contact_ke: 15.0
+  soft_contact_kd: 0.05
+  soft_contact_mu: 3.0
+  solver_iterations: 20
+  linear_iterations: 10
+  style3d_self_collision: true
+  style3d_collision_radius: 0.0003
+  style3d_collision_stiff_vf: 0.005
+  style3d_collision_stiff_ee: 0.002
+  style3d_collision_stiff_ef: 0.02
+
+contact_materials:
+  gripper_shape_mu: 25.0
+
+eval:
+  sim_duration: 20.0
+  check_interval: 1.0
+  success_check:
+    type: all
+    checks:
+      - {type: coverage, threshold: 0.7}
+      - {type: mean_z_below, threshold: 0.03}
+
+randomization:
+  seed: 42
+  cloth_init:
+    mode: procedural_fold
+    base_pos: [0.319347, -0.342035, 0.01]
+    base_quat: [1, 0, 0, 0]
+    pos_offset: {enabled: true, range_x: [-0.02, 0.02], range_y: [-0.02, 0.02]}
+    rot_offset: {enabled: true, axis_z_only: true, angle_range_deg: [-5, 5]}
+
+    procedural_fold:
+      # Anchor only the body center. Unlike medium, the two task grasp patches
+      # are free to move when an inner/left-side program is selected.
+      protected_keypoints: [center]
+      protection_radius: 0.035
+      max_patch_pins: 16
+      # Eight uniformly sampled programs: 50% outer/right, 50% inner/left.
+      program: null
+      lift_height: [0.08, 0.16]
+      segment_durations: [0.25, 0.50, 0.25]
+      final_z: 0.012
+      # 70% of episodes use a near-deep fold; all handles share the sampled depth.
+      fold_depth_range: [0.0, 0.8]
+      fold_depth_deep_probability: 0.70
+      fold_depth_deep_range: [0.8, 1.0]
+      protected_settle_duration: 0.8
+      settle_duration: 0.4
+      programs:
+        # Outer/right side -> negative X.
+        outer_upper_body_in:
+          - {handle: right_sleeve_outer, target: center, offset: [-0.14, 0.08], deep_offset: [-0.22, 0.08]}
+          - {handle: right_collar, target: center, offset: [-0.12, 0.02], deep_offset: [-0.20, 0.02]}
+          - {handle: right_shoulder, target: center, offset: [-0.10, 0.08], deep_offset: [-0.18, 0.08]}
+
+        outer_sleeve_hem_cross:
+          - {handle: right_sleeve_outer, target: center, offset: [-0.10, -0.10], deep_offset: [-0.20, -0.10]}
+          - {handle: right_hem, target: center, offset: [-0.10, 0.14], deep_offset: [-0.20, 0.14]}
+
+        outer_half_in:
+          - {handle: right_sleeve_outer, target: center, offset: [-0.10, 0.04], deep_offset: [-0.20, 0.04]}
+          - {handle: right_hem, target: center, offset: [-0.10, -0.05], deep_offset: [-0.20, -0.05]}
+
+        outer_hem_only:
+          - {handle: right_hem, target: right_collar, offset: [-0.12, -0.05], deep_offset: [-0.28, -0.05]}
+
+        # Inner/left side -> positive X. These programs may directly move the
+        # left_shoulder and left_hem grasp regions toward the garment center.
+        inner_upper_body_in:
+          - {handle: left_sleeve_outer, target: center, offset: [0.14, 0.08], deep_offset: [0.22, 0.08]}
+          - {handle: left_collar, target: center, offset: [0.12, 0.02], deep_offset: [0.20, 0.02]}
+          - {handle: left_shoulder, target: center, offset: [0.10, 0.08], deep_offset: [0.18, 0.08]}
+
+        inner_sleeve_hem_cross:
+          - {handle: left_sleeve_outer, target: center, offset: [0.10, -0.10], deep_offset: [0.20, -0.10]}
+          - {handle: left_hem, target: center, offset: [0.10, 0.14], deep_offset: [0.20, 0.14]}
+
+        inner_half_in:
+          - {handle: left_sleeve_outer, target: center, offset: [0.10, 0.04], deep_offset: [0.20, 0.04]}
+          - {handle: left_hem, target: center, offset: [0.10, -0.05], deep_offset: [0.20, -0.05]}
+
+        inner_hem_only:
+          - {handle: left_hem, target: left_collar, offset: [0.12, -0.05], deep_offset: [0.28, -0.05]}
+
+  robot_init:
+    start_pose: "lift_silk"
+    noise_scale: 0.0
+  light: {enabled: false}

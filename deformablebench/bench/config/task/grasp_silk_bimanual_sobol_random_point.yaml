@@ -1,0 +1,78 @@
+# Grasp-silk v5 ablation: 4K asset + Sobol cloth placement + a random inward
+# mesh vertex around each semantic near-corner keypoint.  All trajectory,
+# physics, robot, and success settings intentionally match the v4 baseline.
+name: grasp_silk_bimanual_sobol_random_point
+task_class: "deformablebench.bench.task.grasp_silk_bimanual:SilkGraspBimanualTask"
+task_description: "dual-arm grasp silk and lift"
+
+cloth: cloth/silk_4k
+robot: piper
+planner: toppra
+control_mode: kinematic
+settle_frames: 120
+
+sim:
+  physics_fps: 500
+  substeps: 1
+  control_fps: 25
+
+randomization:
+  seed: 43
+  cloth_init:
+    base_pos: [0.55, 0.0, 0.01]
+    base_quat: [1, 0, 0, 0]
+    pos_offset: {enabled: true, range_x: [-0.1, 0.1], range_y: [-0.1, 0.1]}
+    rot_offset: {enabled: false, axis_z_only: true, angle_range_deg: [-30, 30]}
+    sampling: sobol
+  robot_init:
+    start_pose: "lift_silk"
+    noise_scale: 0.5
+
+physics:
+  density: 0.093
+  particle_radius: 0.004
+  tri_ka: 500.0
+  tri_kd: 1.0e-4
+  tri_aniso_ke: [40.0, 25.0, 3.0]
+  edge_aniso_ke: [2.5e-07, 1.25e-07, 2.6e-07]
+  edge_kd: 1.0e-4
+  soft_contact_margin: 0.003
+  soft_contact_ke: 50.0
+  soft_contact_kd: 0.1
+  soft_contact_mu: 2.5
+  solver_iterations: 10
+  linear_iterations: 10
+  style3d_self_collision: true
+  style3d_collision_radius: 0.001
+  style3d_collision_stiff_vf: 0.05
+  style3d_collision_stiff_ee: 0.02
+  style3d_collision_stiff_ef: 0.1
+
+contact_materials:
+  gripper_shape_mu: 5.0
+
+planner_override:
+  velocity_limits: 5.0
+  acceleration_limits: 5.0
+
+task_params:
+  grasp_close_val: 0.015
+  grasp_z_offset: -0.001
+  move_vel_scale: 0.15
+  grasp_point_mode: asset_keypoints_random
+  inward_jitter_radius: 0.025
+  grasp_xy_inset: 0.0
+  approach_height: 0.12
+  lift_height: 0.4
+  lift_xy: [0.2, 0.17]
+
+eval:
+  settle_after_frames: 30
+  success_check:
+    type: all
+    checks:
+      - type: bimanual_hold
+        grasp_dist: 0.05
+        lift_height: 0.10
+      - type: mean_z
+        threshold: 0.10

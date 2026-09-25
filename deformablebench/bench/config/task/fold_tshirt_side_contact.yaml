@@ -1,0 +1,9 @@
+# fold_tshirt_side 的接触栈开关变体(2026-09-18,评测修复验证用)。写法同 flatten_tshirt_contact。
+name: fold_tshirt_side_contact
+base: fold_tshirt_side
+
+control_mode: pd
+contact_profile: stopface_h
+anchor_fix: true
+task_params:
+  grasp_close_val: 0.0

@@ -1,0 +1,17 @@
+# flatten_silk_easy 的接触栈开关变体。生产 yaml 一行不改，见 flatten_tshirt_contact.yaml
+# 的完整说明与 docs/GRIPPER-CONTACT.md §1「2026-09-09 现状」。
+#
+# 验收（T18 主批 n=6）：轮 1 首抓 6/6；coverage 0.46-0.98（展平质量归运动/随机侧，
+# 不是接触栈的事）。
+name: flatten_silk_easy_contact
+base: flatten_silk_easy
+
+control_mode: pd
+contact_profile: stopface_h
+anchor_fix: true
+
+task_params:
+  grasp_close_val: 0.0
+
+physics:
+    solver_iterations: 15

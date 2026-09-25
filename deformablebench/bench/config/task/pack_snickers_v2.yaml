@@ -1,0 +1,184 @@
+# pack_snickers_v2 -- same widened box as grasp_bag_strap_v2, minus the yaw range.
+#
+# pack already rotates its offsets by the COMMANDED yaw (cfg.cloth_rot_z, added
+# 2026-07-16), so it does not have the yaw blindness grasp_bag_strap had. Its
+# ceiling is lower though: at this box the four corners pass at +-5 and +-10 deg
+# (margins 1.1-8.2 mm) but two of four FAIL at +-15 deg (right hand 0.095,
+# left hand 0.151 -- real misses, not judge margin). So yaw stays at +-10 deg.
+# The nominal shift to x = 0.43 was checked on its own (nominal + 8 corner runs):
+# the downstream mouth-aim / place stages survive it.
+
+name: pack_snickers_v2
+task_class: "deformablebench.bench.task.task_pack_snickers:PackSnickersTask"
+task_description: "pack the snack into the bag and lift the bag by its straps"
+
+robot: piper
+cloth: "bag/nonwoven_small_6"
+planner: toppra
+# PD needed for Stage A (free rigid snickers); Stage B grasps the strap under
+# the same PD co-sim.
+control_mode: pd
+translation_preconditioner: true
+render: isaac_render
+
+max_steps: 400
+
+# Free rigid snickers bar injected into the scene (Stage A picks it up).
+rigid_objects:
+  - asset: object/snickers
+    pos: [0.50, -0.35, -0.010]
+    quat: [0.5, 0.5, -0.5, -0.5]
+
+# Stage B strap grasp under PD grips weaker than kinematic (tracking lag), and
+# the snickers now rides inside the bag adding weight — so stickier fingers than
+# grasp_bag_strap's kinematic mu 5, plus the same moderate bag stiffening.
+contact_materials:
+  gripper_shape_mu: 10.0
+
+# Cloth physics matched to grasp_bag_strap (same bag asset, same strap grasp;
+# they had diverged — pack never followed grasp_bag_strap's 2026-07-06 retune).
+# Two coupled choices carry this task (measured 2026-07-17):
+#  - self_collision OFF: the bag's ground "walk" (~3 mm/s forever, drifting
+#    y_ref -0.05) is driven by the double-layer self-collision's net tangential
+#    push, NOT friction — with it off the settled bag is dead still (0.00 mm/s).
+#    (Trade-off: the two bag layers can interpenetrate; acceptable here since
+#    the bag is never squashed flat. self_collision is the real solver bug —
+#    net tangential force between resting stacked layers — tracked in
+#    docs/to-optimize.md for the Newton side.)
+#  - stretch stiff (8000) / bend soft (1e-5): a thin bag is stretch-rigid,
+#    bend-floppy (membrane ∝ t, bending ∝ t^3). Stiff stretch carries the
+#    strap->body lift (bag rises 0.09-0.10); soft bend lets the straps drape
+#    into loops the fingers can pinch and keeps the mouth open for Stage A.
+# friction_epsilon back at the physical default (1e-5 was masking the walk and
+# froze the pinched straps — bag hung cocked, lagged the hands).
+physics:
+  tri_aniso_ke: [8000.0, 8000.0, 8000.0]
+  density: 0.3
+  particle_radius: 0.003
+  tri_ka: 500.0
+  tri_kd: 1.0e-4
+  edge_aniso_ke: [1.0e-5, 1.0e-5, 1.0e-5]
+  edge_kd: 1.0e-4
+  soft_contact_margin: 0.0015
+  soft_contact_ke: 50.0
+  soft_contact_kd: 0.1
+  soft_contact_mu: 0.2
+  solver_iterations: 10
+  linear_iterations: 10
+  style3d_self_collision: false
+  style3d_collision_radius: 0.0005
+  style3d_collision_stiff_vf: 0.01
+  style3d_collision_stiff_ee: 0.005
+  style3d_collision_stiff_ef: 0.05
+  style3d_friction_epsilon: 1.0e-2
+
+# Values verbatim from deformable_bench config/task/pack_snicker_v2.yaml.
+task_params:
+  # ---- Stage A: snickers pick & drop into bag mouth ----
+  snickers_arm: right
+  snickers_body_name: snickers_body
+  snickers_grasp_close_val:     0.0
+  snickers_grasp_height_offset: -0.018
+  snickers_grasp_z:             0.005
+  snickers_lift_z:            0.35
+  snickers_above_mouth_offset: 0.10
+  snickers_descend_offset:     0.05
+  snickers_mouth_dx: 0.0
+  snickers_mouth_dy: 0.0
+  snickers_release_val:    1.0
+  snickers_move_to_grasp_velocity_scale: 0.15
+  snickers_close_duration:               0.4
+  snickers_close_settle_time:            0.1
+  snickers_transport_velocity_scale:    [0.2, 0.1]
+  snickers_transport_settle_time:        0.3
+  snickers_descend_velocity_scale:       0.4
+  snickers_descend_settle_time:          0.3
+  snickers_release_duration:             0.6
+  snickers_release_settle_time:          0.0
+  snickers_success_xy_radius:    0.12
+  snickers_success_z_below_mouth: 0.02
+
+  # ---- Stage B: bag-strap grasp & lift (v4 logic) ----
+  # PRE |Δy| back to 0.278 (deformable's original; wide PRE = better strap grasp).
+  # The old 0.260 workaround for the wrist-flip singularity is superseded by the
+  # task's PRE branch guard (_solve_pre_branch_guarded): it checks the IK wrist
+  # branch (healthy R_j4≈+1.4 / L_j4≈-1.4) and, only when an episode's bag lean
+  # (y_ref drift) pushes a PRE target past the flip boundary, pulls THAT arm's
+  # PRE laterally inward in 1cm steps (≤4cm) until the healthy branch returns.
+  # PRE is an empty-air approach point, so pull-in is free; GRASP still aims at
+  # the real strap. (Centroid-drift root cause tracked in to-optimize §8.)
+  bag_pre_offset_xyz:   [0.080, 0.278, 0.205]
+  bag_grasp_offset_xyz: [0.095, 0.120, 0.198]
+  bag_lift_height: 0.45   # same as grasp_bag_strap (0.50 slips the grip)
+  # Static aim correction (recalibrated 2026-07-17 for the aligned physics).
+  # grasp_bag_strap grasps the same straps with ALL FOUR of these at 0 — the
+  # symbolic target (bag origin + live centroid + mirrored |Δy|) is correct on
+  # its own. LEFT here is likewise 0: measured arrival miss is only
+  # (dx,dy,dz)≈(+0.006,+0.009,-0.001), inside the pinch window (pinch 0.001-0.004).
+  # RIGHT alone needs a small correction: the snickers bar sits right-of-centre
+  # and pulls that strap ~1.6 cm further out and ~1.1 cm lower — a real,
+  # episode-consistent drape asymmetry (right arrival miss dy -0.015 / dz -0.011
+  # across ep0/1/2/3), so the fingers close inside+above it and miss ~half the
+  # time. Folding the measured miss into the right target: 3/3 firm.
+  bag_left_dy:  0.0
+  bag_right_dy: -0.014
+  bag_left_dz:  0.0
+  bag_right_dz: -0.011
+  bag_open_gripper_value:  1.0
+  bag_close_gripper_value: 0.01
+  bag_dual_to_home_velocity_scale: 0.40
+  bag_home_to_pre_velocity_scale:  0.40
+  bag_pre_to_grasp_velocity_scale: 0.15
+  bag_lift_velocity_scale:         0.20
+  bag_return_home_velocity_scale:  0.80
+  bag_pre_settle:        0.0
+  bag_grasp_settle:      0.8
+  bag_close_duration:    1.0
+  bag_post_close_settle: 0.5
+  bag_lift_settle:       1.0
+  bag_return_home_settle: 0.0
+  # B5 carry: full old-trajectory amplitude (legacy PLACE_JOINTS moved the
+  # gripper midpoint ~0.30m). Grip-geometry-preserving translation keeps the
+  # straps taut so the bag BODY follows the hands (the legacy replay narrowed
+  # the grip separation 0.31->0.17m, slackening the straps -> body lagged).
+  bag_place_dy: -0.30
+  bag_strap_lift_thresh: 0.35
+  bag_lift_thresh:       0.05  # same as grasp_bag_strap; aligned physics lifts the bag 0.07-0.10, clears 0.05 comfortably
+
+eval:
+  sim_duration: 12.0
+  check_interval: 1.0
+  success_check:
+    type: custom   # delegate to PackSnickersTask.check_success
+
+randomization:
+  # 43 = the seed pack_snickers_v1_0718 was actually collected with (collect_data
+  # --seed 43 overrode the 42 that used to sit here).  Keep this equal to the real
+  # collection seed: eval_sim's apply_eval_seed() guards against an eval seed that
+  # matches it, and a stale value here makes that guard protect the wrong number.
+  seed: 43
+
+  cloth_init:
+    base_pos:  [0.43, 0.00, 0.0]
+    base_quat: [1.0, 0.0, 0.0, 0.0]
+    pos_offset: {enabled: true, range_x: [-0.03, 0.03], range_y: [-0.02, 0.02]}
+    rot_offset: {enabled: true, axis_z_only: true, angle_range_deg: [-10, 10]}
+    settle_duration: 1.5
+
+  robot_init:
+    start_pose: lift_silk
+    noise_scale: 0.5
+
+  light:
+    enabled: false
+
+  rigid_init:
+    snickers_body:
+      pos_offset:
+        enabled: true
+        range_x: [-0.05, 0.05]
+        range_y: [-0.05, 0.05]
+        range_z: [0.0, 0.0]
+      yaw_offset:
+        enabled: true
+        range_deg: [-15, 15]
