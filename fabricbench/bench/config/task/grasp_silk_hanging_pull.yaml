@@ -1,0 +1,79 @@
+name: grasp_silk_hanging_pull
+task_class: "fabricbench.bench.task.grasp_silk_hanging_pull:SilkHangingCornerPullTask"
+task_description: "single-arm gripper grasp test on vertically pinned silk"
+
+cloth: cloth/silk
+robot: piper
+planner: toppra
+control_mode: kinematic
+settle_frames: 20
+
+sim:
+  physics_fps: 500
+  substeps: 1
+  control_fps: 25
+
+# The task reorients the settled sheet into a vertical hanging sheet, so this
+# initial drop only needs to produce a valid cloth state before task setup.
+cloth_init:
+  base_pos: [0.45, 0.0, 0.30]
+  base_quat: [1, 0, 0, 0]
+
+# Raise both arms to the lift_silk home before task setup so they start clear of
+# the sheet. noise_scale 0.0 -> deterministic baseline.
+randomization:
+  robot_init:
+    start_pose: "lift_silk"
+    noise_scale: 0.0
+
+physics:
+  particle_radius: 0.004
+  soft_contact_margin: 0.006
+  soft_contact_ke: 200.0
+  soft_contact_kd: 0.1
+  soft_contact_mu: 2.5
+  solver_iterations: 10
+  linear_iterations: 10
+  style3d_collision_radius: 0.001
+  style3d_collision_stiff_vf: 0.05
+  style3d_collision_stiff_ee: 0.02
+  style3d_collision_stiff_ef: 0.1
+
+contact_materials:
+  gripper_shape_mu: 15.0
+
+planner_override:
+  velocity_limits: 5.0
+  acceleration_limits: 5.0
+
+task_params:
+  arm: right
+  grasp_open_val: 1.0
+  grasp_close_val: 0.03
+
+  # Hanging sheet: top edge is fixed, lower edge hangs around z ~= top_z - 0.35.
+  hang_x: 0.45
+  hang_y: 0.0
+  hang_yaw_deg: -45.0  # clockwise around world Z when viewed from +Z
+  top_z: 0.58
+  top_edge_width: 0.012
+  min_top_pins: 8
+  hanging_settle_frames: 80
+
+  # Grasp the lower corner, then pull back toward the robot side (-x).
+  approach_x_offset: 0.10
+  grasp_x_offset: -0.002
+  grasp_z_offset: 0.0
+  grasp_center_inset: 0.025
+  pull_distance: 0.18
+  pull_lift: 0.02
+  close_duration: 0.6
+  pull_settle: 0.8
+
+  success_grasp_dist: 0.055
+  success_pull_delta: 0.08
+
+eval:
+  settle_after_frames: 30
+  success_check:
+    type: custom

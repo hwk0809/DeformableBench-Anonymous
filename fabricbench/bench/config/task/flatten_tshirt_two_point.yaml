@@ -1,0 +1,126 @@
+# flatten_tshirt: 双臂固定点抓取 (left_shoulder + left_hem) + 单次 fling 展平.
+# 对齐 deformable_bench flatten_tshirt_v3 (FlattenTshirtV3Task, blue_tshirt_9k,
+# two_point_swing_drop init). 数值/资产/init 逐项照 v3.yaml.
+
+name: flatten_tshirt_two_point
+task_class: "fabricbench.bench.task.task_flatten_tshirt:FlattenTshirtTask"
+task_description: "dual-arm grasp left_shoulder + left_hem + single fling (v3 init: two_point_swing_drop)"
+
+robot: piper
+cloth: "cloth/blue_tshirt_9k"
+planner: toppra
+control_mode: kinematic
+render: isaac_render
+
+max_steps: 400
+
+planner_override:
+  velocity_limits: 5.0
+  acceleration_limits: 5.0
+
+# task_params verbatim from deformable_bench flatten_tshirt_v3.yaml.
+task_params:
+  grasp_close_val: 0.015
+  lift_height: 0.4
+  success_thresh: 0.15
+
+  lift_y_half_min: 0.17
+  lift_y_half_max: 0.30
+
+  fling_forward_amplitude: 0.40
+  fling_back_amplitude:    0.04
+  fling_height:            0.12
+  fling_drag_dist:         0.18
+  fling_mid_low_height:    0.20
+  fling_low_height:        0.03
+  fling_vel_scale:         1.5
+  fling_accel_scale:       2.5
+
+cloth_config:
+  gripper_static_friction: 10.0
+  gripper_dynamic_friction: 10.0
+  air_damping: 0.15
+
+# Task-local Style3D tuning.  The shared tshirt asset uses cotton-like stretch
+# stiffness, which is good for folding but too boardy for a fling flatten task.
+# Lower stretch stiffness and add damping for unfoldability; keep gripper contact
+# sticky so the high-impulse fling does not shed the cloth.
+physics:
+  density: 0.09
+  particle_radius: 0.004
+  tri_ka: 500.0
+  tri_kd: 5.0e-5
+  tri_aniso_ke: [270.0, 150.0, 140.0]
+  edge_aniso_ke: [4.3168e-07, 4.3168e-07, 4.3168e-07]
+  edge_kd: 5.0e-5
+  soft_contact_margin: 0.002
+  soft_contact_ke: 15.0
+  soft_contact_kd: 0.05
+  soft_contact_mu: 3.0
+  solver_iterations: 20
+  linear_iterations: 10
+  style3d_self_collision: true
+  style3d_collision_radius: 0.0003
+  style3d_collision_stiff_vf: 0.005
+  style3d_collision_stiff_ee: 0.002
+  style3d_collision_stiff_ef: 0.02
+
+contact_materials:
+  gripper_shape_mu: 25.0
+
+eval:
+  sim_duration: 20.0
+  check_interval: 1.0
+  success_check:
+    type: all
+    checks:
+      - type: coverage
+        threshold: 0.7
+      # avoid early success while the shirt is still spread in the air
+      - type: mean_z_below
+        threshold: 0.03
+
+# ----------------------------------------------------------------------
+# v3 init: two_point_swing_drop (verbatim from flatten_tshirt_v3.yaml)
+#   Shirt spawns high (base_pos.z=0.55). Pin left_shoulder+left_hem at spawn,
+#   pull both out along +X (Y squeezed to mid) → hold → expose-while-drop toward
+#   the table → short final hold → release → settle → recenter to spawn centroid.
+#   run_task drives this from spawn (skips the free settle for two_point_swing_drop).
+# ----------------------------------------------------------------------
+randomization:
+  seed: 42
+  cloth_init:
+    mode: two_point_swing_drop
+    base_pos: [0.319347, -0.342035 , 0.55]
+    base_quat: [1, 0, 0, 0]
+    pos_offset: {enabled: false}
+    rot_offset: {enabled: false}
+
+    two_point_swing_drop:
+      source:
+        keypoints: [left_shoulder, left_hem]
+      pull_x_target:              0.5
+      pull_x_fraction_range:      [0.90, 0.95]
+      pull_y_ratio_range:         [0.32, 0.45]
+      pull_duration:              0.2
+      hold_at_pull_duration:      [0.0, 0.1]
+      expose_while_drop:          true
+      drop_then_expose:           false
+      drop_duration:              0.25
+      drop_final_z:               0.025
+      expose_x_target:            -0.05
+      expose_x_fraction_range:    [0.95, 1.00]
+      expose_y_offset_range:      [-0.02, 0.02]
+      expose_duration:            0.22
+      release_x_target:           -0.05
+      release_x_fraction_range:   [0.95, 1.00]
+      release_duration:           0.5
+      final_hold_duration:        [0.0, 0.1]
+      pre_settle_duration:        0.0
+      settle_duration:            2.0
+      recenter_after_settle:      true
+
+  robot_init:
+    start_pose: "lift_silk"
+    noise_scale: 0.0
+  light: {enabled: false}

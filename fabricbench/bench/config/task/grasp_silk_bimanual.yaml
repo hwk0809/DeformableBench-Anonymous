@@ -1,0 +1,100 @@
+# Dual-arm grasp silk + lift. Modeled on deformable_bench's grasp_silk_bimanual
+# (no-DR baseline). Open-loop with tuned native Style3D cloth-body contact.
+# A weld/attach grasp trick is still the robust fallback if pure pinch slips.
+name: grasp_silk_bimanual
+task_class: "fabricbench.bench.task.grasp_silk_bimanual:SilkGraspBimanualTask"
+task_description: "dual-arm grasp silk and lift"
+
+cloth: cloth/silk_4k
+robot: piper
+planner: toppra
+control_mode: kinematic
+settle_frames: 120   # cloth dropped from base_pos z=0.01 (deformable_bench-aligned) lands flat on the table (min_z 0.004) and settles by frame ~118.
+
+# Frequencies (run_task AND collect_data read this same block). Defaults shown:
+# env.step() at physics_fps with `substeps` substeps -> physics_fps*substeps Hz
+# physics; record/command every physics_fps/control_fps frames. control_fps must
+# divide physics_fps. 50*10=500 Hz physics, 50/25=2 -> clean 25 Hz (= real rig).
+sim:
+  physics_fps: 500
+  substeps: 1
+  control_fps: 25
+
+# Cloth init lives UNDER `randomization:` — fabricbench reads pos/rot offset from
+# randomization.cloth_init (scene_config -> sample_cloth_placement). Aligned to
+# deformable_bench grasp_silk_bimanual: base_pos (0.55,0,0.01), cloth xy dropped
+# from a fixed 1 cm and randomized ±0.10 m; z (drop height) is the settle target.
+#
+# Robot start pose: raise both arms to the lift_silk home so they clear the cloth
+# and the planner plans from the raised config (grasp_silk_bimanual seeds the plan
+# from env.left_qpos/right_qpos). noise_scale 0.5 = deployment-realistic arm-init
+# jitter (matches noise05 training + eval). seed 43 matches deformable_bench.
+randomization:
+  seed: 43
+  cloth_init:
+    base_pos: [0.55, 0.0, 0.01]
+    base_quat: [1, 0, 0, 0]
+    pos_offset: {enabled: true, range_x: [-0.1, 0.1], range_y: [-0.1, 0.1]}
+    rot_offset: {enabled: false, axis_z_only: true, angle_range_deg: [-30, 30]}
+    # v4 baseline: preserve the historical per-episode uniform placement.
+    # Sobol is enabled only by grasp_silk_bimanual_sobol_random_point.yaml.
+    sampling: random
+  robot_init:
+    start_pose: "lift_silk"
+    noise_scale: 0.5
+
+# Per-task Style3D cloth physics/contact tuning. Silk is thin and flat, so native pinch
+# needs a wider contact envelope, stronger body-particle contact, and more
+# solver iterations than the drop demos.
+physics:
+  density: 0.093
+  particle_radius: 0.004
+  tri_ka: 500.0
+  tri_kd: 1.0e-4
+  tri_aniso_ke: [40.0, 25.0, 3.0]
+  edge_aniso_ke: [2.5e-07, 1.25e-07, 2.6e-07]
+  edge_kd: 1.0e-4
+  soft_contact_margin: 0.003
+  soft_contact_ke: 50.0
+  soft_contact_kd: 0.1
+  soft_contact_mu: 2.5
+  solver_iterations: 10
+  linear_iterations: 10
+  style3d_self_collision: true
+  style3d_collision_radius: 0.001
+  style3d_collision_stiff_vf: 0.05
+  style3d_collision_stiff_ee: 0.02
+  style3d_collision_stiff_ef: 0.1
+
+# Keep the table from becoming sticky while making only the gripper fingers
+# high-friction for cloth-body contact.
+contact_materials:
+  # default_shape_mu: 0.3
+  gripper_shape_mu: 5.0
+
+planner_override:
+  velocity_limits: 5.0
+  acceleration_limits: 5.0
+
+task_params:
+  grasp_close_val: 0.015     # gripper open fraction [0,1]: 1=open, 0=closed (match reference)
+  grasp_z_offset: -0.001
+  move_vel_scale: 0.15       # match reference robust grasp approach speed (was full-speed)
+  # Read corner_LD/corner_RD from the selected cloth asset_meta.yaml. These are
+  # stable corner-region grasp points, not per-episode geometric extrema.
+  grasp_point_mode: asset_keypoints
+  grasp_xy_inset: 0.0     # meters, move corner targets toward cloth center
+  approach_height: 0.12
+  lift_height: 0.4
+  lift_xy: [0.2, 0.17]
+
+eval:
+  settle_after_frames: 30
+  success_check:
+    type: all
+    checks:
+      - type: bimanual_hold
+        grasp_dist: 0.05
+        lift_height: 0.10
+      - type: mean_z
+        threshold: 0.10

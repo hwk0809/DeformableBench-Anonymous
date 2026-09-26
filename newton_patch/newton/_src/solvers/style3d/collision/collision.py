@@ -2872,7 +2872,7 @@ class Collision:
             flush=True,
         )
         # T41 开关：三角形级位置投影。与 fork 里 T15/T18/T31/T34/T36 同一套传统
-        # （import 时不生效、只在 enable 时读一次环境变量），所以 deformablebench 侧一行不用改。
+        # （import 时不生效、只在 enable 时读一次环境变量），所以 fabricbench 侧一行不用改。
         # 不设 / 设 0 ⇒ self.tri_sdf_projection 保持 False ⇒ 下面三处分支全不进，
         # OFF 路径与本开关引入前逐位相同（无新增 kernel launch、无新增分配）。
         import os as _os

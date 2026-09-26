@@ -1,0 +1,26 @@
+renderer: PathTracing
+spp: 30
+optix_denoiser: false
+cloth_normals: true
+cloth_subdivision: "loop"
+cloth_subdivision_level: 0
+texture_streaming: false
+width: 1000
+height: 1000
+
+base_scene_usd: "assets/scene/usd/whole_scene_piper_thin_gripper_base.usda"
+cameras: ["/World/Fig4TopCamera"]
+
+kit_app: "<KIT_ROOT>/kit-app-template/_build/linux-x86_64/release/my_company.my_usd_composer.kit.sh"
+kit_render_script: "src/fabricbench/bench/render/kit_app/omniverse_kit_render_v7.py"
+kit_python: null
+
+kit_capture_timeout: 30.0
+kit_capture_retries: 2
+kit_capture_retry_updates: 10
+kit_frame_updates: 1
+kit_camera_updates: 6
+image_shm: true
+kit_stream_timeout: 180.0
+active_gpu: 0
+timeout: 1200

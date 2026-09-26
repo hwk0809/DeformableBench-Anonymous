@@ -1,0 +1,83 @@
+name: fling_silk_bimanual
+task_class: "fabricbench.bench.task.task_fling_silk_bimanual:SilkFlingBimanualTask"
+task_description: "dual-arm grasp of silk cloth and single fling"
+
+robot: piper
+cloth: "cloth/silk"
+planner: toppra
+control_mode: kinematic
+render: isaac_render
+
+max_steps: 300
+
+task_params:
+  grasp_close_val: 0.015   # gripper open fraction [0,1]: 1=open, 0=closed
+
+collision_trick:
+  enabled: true
+  closed_threshold: 0.02
+  opening_threshold: 0.03
+  fully_open_threshold: 0.5
+  reenable_cooldown_steps: 12
+  stable_motion_epsilon: 0.001
+  closing_reenable_delta: 0.03
+  closing_reenable_steps: 2
+  closed_confirm_steps: 1
+
+# Per-task Style3D cloth physics/contact tuning. Matches grasp_silk_bimanual so
+# the native pinch has the same contact envelope and solver budget before fling.
+physics:
+  density: 0.093
+  particle_radius: 0.004
+  tri_ka: 500.0
+  tri_kd: 1.0e-4
+  tri_aniso_ke: [40.0, 25.0, 3.0]
+  edge_aniso_ke: [2.5e-07, 1.25e-07, 2.6e-07]
+  edge_kd: 1.0e-4
+  soft_contact_margin: 0.003
+  soft_contact_ke: 25.0
+  soft_contact_kd: 0.1
+  soft_contact_mu: 2.5
+  solver_iterations: 10
+  linear_iterations: 8
+  style3d_self_collision: true
+  style3d_collision_radius: 0.001
+  style3d_collision_stiff_vf: 0.05
+  style3d_collision_stiff_ee: 0.02
+  style3d_collision_stiff_ef: 0.1
+
+contact_materials:
+  gripper_shape_mu: 5.0
+
+# 评测配置
+eval:
+  sim_duration: 12.0
+  check_interval: 1.0
+  success_check:
+    type: coverage
+    threshold: 0.5
+
+# fling 时加速度倍率 (基于 planner 的 acceleration_limits)
+fling_accel_scale: 2.0
+
+# Fling 同 flatten: 需要折皱初始才有意义. random_fold 把一个角点拖到对侧造折.
+# fold_height 0.25 见 flatten_silk_easy.yaml 注释 (newton silk_35 调参值).
+randomization:
+  seed: 7
+  cloth_init:
+    base_pos: [0.5, 0.0, 0.01]
+    pos_offset: {enabled: true, range_x: [-0.1, 0.1], range_y: [-0.1, 0.1]}
+    rot_offset: {enabled: true, axis_z_only: true, angle_range_deg: [-15, 15]}
+    random_fold:
+      enabled: true
+      source: {candidates: [corner_LU, corner_RU, corner_LD, corner_RD], radius: 0.02}
+      target_offset: {delta_x: [0.22, 0.32], delta_y: [-0.05, 0.18]}
+      fold_height: 0.25
+      pre_settle_duration: 0.2
+      seg_durations: [0.4, 0.6, 0.4]
+      pin_duration: 0.3
+      settle_duration: 1.5
+      final_z: 0.005
+  robot_init:
+    start_pose: "lift_silk"
+    noise_scale: 0.5

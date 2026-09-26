@@ -1,0 +1,186 @@
+# flatten_silk 难度分级 easy 档: 确定性单折初始态 (只把远角往近折 + 小抖动).
+# 收窄目标: 近角对 (LD, RD) 永远暴露且过 filter → 每个 episode 都走真机对齐的
+# fling 分支 (轨迹分布锁定); spread 分支保留作兜底, 正常不触发.
+# hard 档 (随机掉落乱态) 见 flatten_silk_hard.yaml.
+
+name: flatten_silk_easy
+task_class: "fabricbench.bench.task.task_flatten_silk:FlattenSilkTask"
+task_description: "grasp two corners of the cloth and fling it to spread it flat"
+
+robot: piper
+cloth: "cloth/silk_4k"
+planner: toppra
+control_mode: kinematic
+render: isaac_render
+
+max_steps: 800
+
+planner_override:
+  velocity_limits: 5.0
+  acceleration_limits: 5.0
+
+task_params:
+  grasp_close_val: 0.015
+  lift_height: 0.4
+  success_coverage: 0.95
+  max_flings: 2
+
+  # 6-DOF 可达约束 (欧氏球, Boss 调参用)
+  workspace_radius: 0.70
+  ws_limit_scale: 0.95
+
+  # lift/spread/fling Y 间距 = cloth_corner_dist × lift_stretch_ratio
+  # silk_35 corner_dist ≈ 0.32m → ratio 0.9 = half_w 0.144m, ratio 0.85 = half_w 0.136m
+  # 真机 lift 0.311m / corner_dist 0.32 ≈ 0.97 偏紧, 留余地用 0.9 / 0.85 (Boss tune 测)
+  lift_stretch_ratio: 0.9
+
+  debug: true
+  show_plot: false
+
+  # Filter / degenerate / retry 参数直接改 task 源码默认值, yaml 不再暴露.
+
+  grasp:
+    # TCP_bottom Z 下压深度 (米, 负=进 table 方向). -0.01 = 压 1cm.
+    z_offset: -0.02
+    # retry 时每次加深多少 (负=更深)
+    z_offset_retry_step: -0.005
+
+    # 非 canonical hull 点沿内法向偏移 (米). 0 = 直接抓 hull 顶点.
+    inward_offset: 0.0
+
+    # 远点 outward 补偿 (针对 tilt 让实际夹点落在 pad 后方 ~11mm)
+    far_outward_comp_enabled: false
+    far_outward_comp:
+      r_thr: 0.45
+      coeff: 0.12
+      max_m: 0.020
+
+    async_close: false
+    async_close_delay_range: [0.1, 0.3]
+
+    slow_approach: false
+    slow_approach_via_distance_range: [0.08, 0.12]
+    slow_approach_final_vel_scale: 0.08
+
+    ground_check: false
+
+    yaw_jitter: false
+    yaw_jitter_range_deg: [-3.0, 3.0]
+
+  fling:
+    # 真机对齐调参值 (与 task py DEFAULT_FLING_CFG 同步)
+    pullback_x: 0.10
+    pullback_z: 0.45
+    swing_top_x: 0.48
+    swing_top_z: 0.50
+    retract_x: 0.52
+    retract_z: 0.30
+    release_x: 0.27
+    release_z: 0.05
+    pullback_vel_scale: 0.4
+    swing_vel_scales: [1.0, 0.10, 0.10]
+    swing_accel_scale: 2.0
+
+  # spread: lift (单独 step) + spread sweep (waypoints 2 点) + release
+  #   lift    (0.50, 0.40): 单独 step, 远端原地升 z (X=0.50 跟抓取接近, 不扯)
+  #   sweep waypoints:
+  #     retract (0.30, 0.40): 拉回中部
+  #     down    (0.55, 0.05): 推到远端低位释放
+  spread:
+    lift_x: 0.50
+    lift_z: 0.40
+    lift_vel_scale: 0.4
+    lift_settle: 0.3
+    retract_x: 0.30
+    retract_z: 0.40
+    down_x: 0.55
+    down_z: 0.05
+    sweep_vel_scale: [0.4, 0.8]
+    sweep_accel_scale: 1.0
+    sweep_settle: 0.5
+    release_duration: 0.3
+    release_settle: 0.5
+
+cloth_config:
+  # 抓取后转运掉布问题与摩擦无关 (10/30 实测无差), 见 to-optimize §11. 保持 10.
+  gripper_static_friction: 10.0
+  gripper_dynamic_friction: 10.0
+  air_damping: 0.15
+
+# Per-task Style3D cloth physics/contact tuning. Material values mirror the
+# silk asset defaults unless this task intentionally overrides them.
+physics:
+  density: 0.06
+  particle_radius: 0.004
+  tri_ka: 500.0
+  tri_kd: 1.0e-4
+  tri_aniso_ke: [40.0, 25.0, 3.0]
+  edge_aniso_ke: [2.5e-07, 1.25e-07, 2.6e-07]
+  edge_kd: 1.0e-4
+  soft_contact_margin: 0.003
+  soft_contact_ke: 25.0
+  soft_contact_kd: 0.1
+  soft_contact_mu: 1.2
+  solver_iterations: 15
+  linear_iterations: 10
+  style3d_self_collision: true
+  style3d_collision_radius: 0.001
+  style3d_collision_stiff_vf: 0.05
+  style3d_collision_stiff_ee: 0.02
+  style3d_collision_stiff_ef: 0.1
+
+contact_materials:
+  gripper_shape_mu: 5.0
+
+eval:
+  sim_duration: 20.0
+  check_interval: 1.0
+  success_check:
+    type: all
+    checks:
+      - type: coverage
+        threshold: 0.95
+      - type: flatness
+        threshold: 0.01
+
+# easy 初始化: cloth_center=(0.40, 0), 确定性单折 (只折远角) + 位置/旋转抖动.
+# 相对旧全随机预设的唯一实质改动是 fold (选点收窄 + fold_height 关键修复);
+# pos/rot 幅度与旧 v6 对齐 (掉布问题与摆放随机无关, 见 to-optimize §11):
+#   pos ±0.05, rot ±10° (= 旧 v6 值)
+#   fold candidates 4 角→只远角 (LU/RU): 近角对永远干净 → 永远走 fling 分支
+#   fold_height 0.25→0.15: 关键参数. 0.25 挂起半张布, 拖拽把整布拖偏 7-11cm +
+#     旋转 (near_mid_y 漂到 -0.11), 后续固定 lift/fling 路点全歪. 0.15 只挂角部,
+#     漂移 4.5cm, 折痕成形 (2026-07-03 扫参实测).
+#   delta_x [0.15, 0.20]: 扫参 PASS 包络 (0.12-0.23 @ h=0.15 皆可, cov 0.75-0.85);
+#     0.30 会把远角折到近角上 (silk 全长 0.35), 近角对被 occlusion 拒
+#   delta_y [0.05, 0.15] 朝内: 落点远离同侧近角, 去掉朝外负值 (卷边风险)
+randomization:
+  seed: 43
+  cloth_init:
+    base_pos: [0.40, 0.0, 0.01]
+    base_quat: [1, 0, 0, 0]
+    pos_offset: {enabled: true, range_x: [-0.05, 0.05], range_y: [-0.05, 0.05]}
+    rot_offset: {enabled: true, axis_z_only: true, angle_range_deg: [-10, 10]}
+    sampling: random
+
+    random_fold:
+      enabled: true
+      source:
+        candidates: [corner_LU, corner_RU]
+        radius: 0.02
+      target_offset:
+        delta_x: [0.15, 0.20]
+        delta_y: [0.05, 0.15]
+      # fold_height: 0.08 太低角点 drape back (cov~0.96, init_already_flat);
+      # 0.25 挂起半张布把整布拖偏+旋转 (见文件头注释). 0.15 = 只挂角部的甜点区.
+      fold_height: 0.15
+      pre_settle_duration: 0.2
+      seg_durations: [0.4, 0.6, 0.4]
+      pin_duration: 0.3
+      settle_duration: 1.5
+      final_z: 0.005
+
+  robot_init:
+    start_pose: "lift_silk"
+    noise_scale: 0.5
+  light: {enabled: false}

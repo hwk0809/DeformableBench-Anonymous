@@ -1,0 +1,86 @@
+# Experimental flatten-T-shirt task using a random airborne two-pin drop.
+name: flatten_tshirt_airborne_two_pin_drop
+task_class: "fabricbench.bench.task.task_flatten_tshirt:FlattenTshirtTask"
+task_description: "grasp left shoulder and left hem after a two-pin drop, then flatten the T-shirt"
+
+robot: piper
+cloth: "cloth/blue_tshirt_9k"
+planner: toppra
+control_mode: kinematic
+render: isaac_render
+max_steps: 400
+
+planner_override:
+  velocity_limits: 5.0
+  acceleration_limits: 5.0
+
+task_params:
+  grasp_close_val: 0.015
+  lift_height: 0.4
+  success_thresh: 0.15
+  lift_y_half_min: 0.17
+  lift_y_half_max: 0.30
+  fling_forward_amplitude: 0.40
+  fling_back_amplitude: 0.04
+  fling_height: 0.12
+  fling_drag_dist: 0.18
+  fling_mid_low_height: 0.20
+  fling_low_height: 0.03
+  fling_vel_scale: 1.5
+  fling_accel_scale: 2.5
+
+physics:
+  density: 0.09
+  particle_radius: 0.004
+  tri_ka: 500.0
+  tri_kd: 5.0e-5
+  tri_aniso_ke: [270.0, 150.0, 140.0]
+  edge_aniso_ke: [4.3168e-07, 4.3168e-07, 4.3168e-07]
+  edge_kd: 5.0e-5
+  soft_contact_margin: 0.002
+  soft_contact_ke: 15.0
+  soft_contact_kd: 0.05
+  soft_contact_mu: 3.0
+  solver_iterations: 20
+  linear_iterations: 10
+  style3d_self_collision: true
+  style3d_collision_radius: 0.0003
+  style3d_collision_stiff_vf: 0.005
+  style3d_collision_stiff_ee: 0.002
+  style3d_collision_stiff_ef: 0.02
+
+contact_materials:
+  gripper_shape_mu: 25.0
+
+eval:
+  sim_duration: 20.0
+  check_interval: 1.0
+  success_check:
+    type: all
+    checks:
+      - {type: coverage, threshold: 0.7}
+      - {type: mean_z_below, threshold: 0.03}
+
+randomization:
+  seed: 42
+  cloth_init:
+    mode: airborne_two_pin_drop
+    base_pos: [0.319347, -0.342035, 0.01]
+    base_quat: [1, 0, 0, 0]
+    pos_offset: {enabled: true, range_x: [-0.02, 0.02], range_y: [-0.02, 0.02]}
+    rot_offset: {enabled: true, axis_z_only: true, angle_range_deg: [-5, 5]}
+
+    airborne_two_pin_drop:
+      candidate_stride: 10
+      pin_separation: [0.10, 0.45]
+      spawn_centroid_z: [0.32, 0.48]
+      spawn_x_offset: [0.15, 0.25]
+      hold_duration: [1.0, 3.0]
+      settle_duration: 2.0
+      recenter_after_settle: true
+      recenter_settle_duration: 0.3
+
+  robot_init:
+    start_pose: "lift_silk"
+    noise_scale: 0.0
+  light: {enabled: false}

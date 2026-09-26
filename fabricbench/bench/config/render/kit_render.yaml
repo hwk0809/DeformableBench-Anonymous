@@ -1,0 +1,37 @@
+# Kit (Omniverse) path-traced render config — ported from deformable_bench's
+# config/render/isaac_render.yaml, paths rebased to fabricbench (self-contained).
+# Used by the `--render kit` collection path (ShmKitBridge launches Kit with this).
+
+# --- Renderer ---
+renderer: PathTracing          # physically accurate GI; RayTracedLighting = fast, no GI
+spp: 30
+optix_denoiser: false
+cloth_normals: true            # Style3D per-vertex normals -> saved to render_state
+cloth_subdivision: "loop"      # Loop subdivision for smooth cloth shading
+cloth_subdivision_level: 0
+texture_streaming: false       # off = textures pinned full-res (no multi-cam flicker)
+width: 1280
+height: 720
+
+# --- Scene & cameras (self-contained under assets/) ---
+base_scene_usd: "assets/scene/usd/whole_scene_piper_thin_gripper_base.usda"
+# default = 3 cameras (front_oblique_cam is optional/extra; add it back here to
+# render the 4th). omniverse_kit_render_v7 still knows how to create it on request.
+cameras: [static_cam, right_hand_cam, left_hand_cam]
+
+# --- Kit application (copied into thirdparty/, machine-local build) ---
+kit_app: "thirdparty/kit-app-template/_build/linux-x86_64/release/my_company.my_usd_composer.kit.sh"
+kit_render_script: "src/fabricbench/bench/render/kit_app/omniverse_kit_render_v7.py"
+kit_python: null
+
+# --- Kit tuning ---
+kit_capture_timeout: 30.0
+kit_capture_retries: 2
+kit_capture_retry_updates: 10
+kit_frame_updates: 1           # app.update() per TICK (1 = ~1-2 step latency, sim2real-ish)
+kit_camera_updates: 6          # app.update() after camera switch (PathTracing reconverge)
+image_shm: true                # v6: RGB back over shared memory (skip PNG encode/IO)
+kit_stream_timeout: 180.0
+
+# --- Orchestrator ---
+timeout: 400                   # per-episode total timeout (s)
