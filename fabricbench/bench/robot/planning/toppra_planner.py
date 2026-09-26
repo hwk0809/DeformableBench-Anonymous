@@ -23,7 +23,7 @@ from fabricbench.bench.robot.planning.base_planner import BasePlanner
 from fabricbench.bench.robot.kinematics.base_kinematics import BaseKinematics
 
 try:
-    from fabricbench.bench.robot.kinematics.pinocchio_kinematics import PinocchioKinematics 
+    from fabricbench.bench.robot.kinematics.pinocchio_kinematics import PinocchioKinematics
     # from fabricbench.bench.robot.kinematics.rtb_kinematics import RtbKinematics
 except ImportError as e:
     logger.error(f"[ToppraPlanner] Kinematics not found: {e}. Please ensure Kinematics is installed and properly configured.")
