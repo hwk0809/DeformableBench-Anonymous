@@ -568,6 +568,8 @@ footer .foot { display:grid; grid-template-columns:1fr 1.3fr; gap:40px; align-it
 .xs .res.good { color:#9fe3b5; } .xs .res.good::before { content:"✓"; }
 .xs .res.bad { color:#ffb3a8; } .xs .res.bad::before { content:"✕"; }
 .xsload { font:500 11px/1 "JetBrains Mono", monospace; color:var(--muted); margin-top:10px; min-height:11px; }
+.xs .ph.fail.lit { border:1.5px solid #ff6b57; background:rgba(255,90,70,.22); color:#fff; box-shadow:0 0 0 3px rgba(255,90,70,.15); }
+.xs .ph.fail.lit i { color:#ff8a7a; font-size:18px; font-weight:700; }
 .layoutsw { position:fixed; right:14px; bottom:14px; z-index:50; display:flex; gap:6px; background:var(--bg2); border:1px solid var(--line); padding:6px; border-radius:6px; }
 
 .xs.real { border-style:dashed; }
@@ -631,7 +633,7 @@ const xsim = document.getElementById("xsim");
 xsim.innerHTML = XS.map((x,i)=>`<div class="xs ${x.ours?'ours':''} ${x.real?'real':''}">
   <div class="vw">${x.v ? `<video data-off="${x.off||0}" src="${x.v}" muted playsinline preload="auto"></video>` :
     `<div class="pending"><b>${x.real?'FOOTAGE PENDING':'RENDER PENDING'}</b>${x.real?'Real robot, same motion,<br>to be recorded':'Same replay, same camera'}</div>`}</div>
-  <div class="meta"><div class="nm"><b>${x.n}</b>${x.sc?`<span class="sc ${x.ok?'good':'bad'}">${x.sc}</span>`:""}</div><div class="phases">${["Grasp","Hold","Release"].map((p,j)=>`<div class="ph" data-k="${j}" data-r="${x.ph[j]}">${p}<i>${x.ph[j]==="y"?"✓":x.ph[j]==="n"?"✕":"–"}</i></div>`).join("")}</div><div class="res ${x.ok?'good':'bad'}">${x.why}</div></div></div>`).join("");
+  <div class="meta"><div class="nm"><b>${x.n}</b>${x.sc?`<span class="sc ${x.ok?'good':'bad'}">${x.sc}</span>`:""}</div><div class="phases">${["Grasp","Hold","Release"].map((p,j)=>`<div class="ph${j===x.ph.indexOf("n")?" fail":""}" data-k="${j}" data-r="${x.ph[j]}">${p}<i>${x.ph[j]==="y"?"✓":x.ph[j]==="n"?"✕":"–"}</i></div>`).join("")}</div><div class="res ${x.ok?'good':'bad'}">${x.why}</div></div></div>`).join("");
 
 const LAYOUT = new URLSearchParams(location.search).get("layout")==="two" ? "two" : "row";
 xsim.classList.add("L-"+LAYOUT);
@@ -645,7 +647,7 @@ const xsLoad = document.createElement("div"); xsLoad.className = "xsload"; xsim.
 function xsCheckReady(){
   const n = xsVids.filter(v => v.readyState >= 4 || (v.buffered.length && v.duration && v.buffered.end(v.buffered.length-1) >= v.duration - 0.1)).length;
   xsLoad.textContent = n < xsVids.length ? `Loading videos ${n}/${xsVids.length}…` : "";
-  if (!xsReady && n === xsVids.length) { xsReady = true; xsTime = 0; xsPrev = performance.now(); xsApply(true); }
+  if (!xsReady && n === xsVids.length) { xsReady = true; xsTime = +(new URLSearchParams(location.search).get("at")||0); if (xsTime) xsOn = false; xsPrev = performance.now(); xsApply(true); }
 }
 xsVids.forEach(v => { v.preload = "auto"; ["canplaythrough","progress","loadeddata"].forEach(ev => v.addEventListener(ev, xsCheckReady)); v.load(); });
 setInterval(()=>{ if (!xsReady) xsCheckReady(); }, 500);
