@@ -622,7 +622,7 @@ footer .foot { display:grid; grid-template-columns:1fr 1.3fr; gap:40px; align-it
 
 <script>
 const XS = [
-  {n:"Real robot", s:"real", v:"assets/sim/real.mp4?v=5", off:-0.44, ph:["y","y","y"], sc:"", ms:"", why:"grasped, held, released", real:true, ok:true},
+  {n:"Real robot", s:"real", v:"assets/sim/real.mp4?v=6", off:0, ph:["y","y","y"], sc:"", ms:"", why:"grasped, held, released", real:true, ok:true},
   {n:"FabricBench", s:"ours", v:"assets/sim/traj02_it20_realcam.mp4?v=5", off:0.0, ph:["y","y","y"], sc:"45/45", ms:"4.8", why:"grasped, held, released", ours:true, ok:true},
   {n:"Isaac Sim PBD", s:"PBD cloth", v:"assets/sim/t02_isaac_realcam.mp4?v=5", ph:["n","n","-"], sc:"0/45", ms:"5.3", why:"fails to grasp", ok:false},
   {n:"VBD", s:"released", v:"assets/sim/t02_vbd_realcam.mp4?v=5", ph:["y","y","n"], sc:"0/45", ms:"5.6", why:"fingers penetrate the cloth; not released", ok:false},
@@ -654,7 +654,7 @@ setInterval(()=>{ if (!xsReady) xsCheckReady(); }, 500);
 setTimeout(()=>{ if (!xsReady) { xsReady = true; xsLoad.textContent = ""; xsApply(true); } }, 20000);
 function xsApply(seek){
   xsVids.forEach(v=>{ const off = +v.dataset.off, d = v.duration || XS_LEN, tt = Math.max(0, Math.min(xsTime-off, d-0.05));
-    if (seek || (v.readyState >= 3 && Math.abs(v.currentTime - tt) > 0.3)) v.currentTime = tt;
+    if (!v.seeking && (seek || (v.readyState >= 3 && Math.abs(v.currentTime - tt) > 0.3))) v.currentTime = tt;
     const run = xsReady && xsOn && xsVisible && xsTime >= off && xsTime-off < d-0.05;
     if (run) { if (v.paused) v.play().catch(()=>{}); } else if (!v.paused) v.pause(); });
   const f = xsTime/XS_LEN*100; xsFill.style.width = f+"%"; xsKnob.style.left = f+"%";
